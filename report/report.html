@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 05-Aug-2022 at 09:33:52 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>C:\Program Files (x86)\Java\jdk-11.0.2</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "1.0.0", "py": "1.11.0", "pytest": "7.1.2"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.17763-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "3.1.1", "metadata": "2.0.1"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.10.1</td></tr></table>
+    <h2>Summary</h2>
+    <p>32 tests ran in 354.47 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">32 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_add_remove_elements</td>
+          <td class="col-duration">3.83</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>
+THIS IS A SETUP CONFIGURATION!
+Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: Navigate to Add/Remove Elements Page  ####################
+
+Locating element: ADD_REMOVE_ELEMENTS_LINK
+Clicked on element: ADD_REMOVE_ELEMENTS_LINK
+
+#################### TEST STEP: Verify that &#x27;Delete Element&#x27; button is not visible  ####################
+
+waiting for 30 seconds until element: **delete_element_button** is NOT visible 
+
+#################### TEST STEP: Click &#x27;Add Element&#x27; Button  ####################
+
+Locating element: add_element_button
+Clicked on element: add_element_button
+
+#################### TEST STEP: Verify that &#x27;Delete&#x27; button shows up on the page  ####################
+
+waiting for 30 seconds until element: **delete_element_button** is visible 
+
+#################### TEST STEP: Click &#x27;Delete&#x27; Button  ####################
+
+Locating element: delete_element_button
+Clicked on element: delete_element_button
+
+#################### TEST STEP: Verify that the &#x27;Delete&#x27; Button is no longer visible  ####################
+
+waiting for 30 seconds until element: **delete_element_button** is NOT visible 
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_broken_image</td>
+          <td class="col-duration">0.93</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: Navigate to Broken Images Page  ####################
+
+Locating element: BROKEN_IMAGE_LINK
+Clicked on element: BROKEN_IMAGE_LINK
+
+#################### TEST STEP: Get all images  ####################
+
+Locating all elements of: all_images
+
+#################### TEST STEP: Look through all images and sort them if they are Broken Image or Not  ####################
+
+Total Image count is: 3
+Total Valid Image count is: 1
+Total Broken Image count is: 2
+
+#################### TEST STEP: Verify that the total broken images is 2  ####################
+
+Verified Successfully. total broken image is: 2
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_checkboxes</td>
+          <td class="col-duration">0.88</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: Navigate to Checkboxes Page  ####################
+
+Locating element: CHECKBOXES_LINK
+Clicked on element: CHECKBOXES_LINK
+
+#################### TEST STEP: Verify that Checkbox 1 is unchecked by default  ####################
+
+Verified successfully. Checkbox of **Checkbox_1** is marked as &#x27;False&#x27; 
+
+#################### TEST STEP: Verify that Checkbox 2 is checked by default  ####################
+
+Verified successfully. Checkbox of **Checkbox_2** is marked as &#x27;True&#x27; 
+
+#################### TEST STEP: Click and mark Checkbox 1 as checked  ####################
+
+Locating element: Checkbox_1
+Clicked on element: Checkbox_1
+
+#################### TEST STEP: Verify that Checkbox 1 is checked  ####################
+
+Verified successfully. Checkbox of **Checkbox_1** is marked as &#x27;True&#x27; 
+
+#################### TEST STEP: Click and mark Checkbox 2 as unchecked  ####################
+
+Locating element: Checkbox_2
+Clicked on element: Checkbox_2
+
+#################### TEST STEP: Verify that Checkbox 2 is unchecked  ####################
+
+Verified successfully. Checkbox of **Checkbox_2** is marked as &#x27;False&#x27; 
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_context_menu</td>
+          <td class="col-duration">1.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: Navigate to Context Menu Page  ####################
+
+Locating element: CONTEXT_MENU_LINK
+Clicked on element: CONTEXT_MENU_LINK
+
+#################### TEST STEP: Right Click on Context Menu Box  ####################
+
+Right clicking on element: context_menu_box
+Locating element: context_menu_box
+
+#################### TEST STEP: Assert Alert Text and Accept  ####################
+
+actual alert message: You selected a context menu
+Verified Successfully. expected alert: **You selected a context menu** is in actual alert message: **You selected a context menu**
+Action: Alert Accepted!
+
+#################### TEST STEP: Open new tab to remove context menu options  ####################
+
+You opened new tab
+
+#################### TEST STEP: Switch to old tab  ####################
+
+You switched to tab with the index of: 0
+
+#################### TEST STEP: Close current tab to remove context menu options  ####################
+
+You closed the current tab!
+Closed tab page url: https://the-internet.herokuapp.com/context_menu
+Closed tab page title: The Internet
+
+#################### TEST STEP: Switch to the new and remaining window tab  ####################
+
+You switched to tab with the index of: 0
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_disappearing_elements</td>
+          <td class="col-duration">31.52</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: Navigate to Disappearing Elements Page  ####################
+
+Locating element: DISAPPEARING_ELEMENTS_LINK
+Clicked on element: DISAPPEARING_ELEMENTS_LINK
+
+#################### TEST STEP: Refresh Page 5 times and record if gallery is visible and not visible  ####################
+
+waiting for 3 seconds until element: **gallery_button** is NOT visible 
+refresh count 0: Gallery Button is available
+waiting for 3 seconds until element: **gallery_button** is NOT visible 
+refresh count 1: Gallery Button is available
+waiting for 3 seconds until element: **gallery_button** is NOT visible 
+refresh count 2: Gallery Button not available
+waiting for 3 seconds until element: **gallery_button** is NOT visible 
+refresh count 3: Gallery Button is available
+waiting for 3 seconds until element: **gallery_button** is NOT visible 
+refresh count 4: Gallery Button is available
+
+#################### TEST STEP: Print Result of &#x27;Gallery visible times&#x27;   ####################
+
+gallery visible times: 4
+gallery not visible times: 1
+total refresh times: 5
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_drag_and_drop</td>
+          <td class="col-duration">14.41</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: Navigate to Drag and Drop Page  ####################
+
+Go to url: https://demo.guru99.com/test/drag_drop.html
+
+#################### TEST STEP: Wait for Page to be fully Loaded. Wait 10 seconds  ####################
+
+Sleep for a few seconds: 10
+
+#################### TEST STEP: Start Drag and Drop Action  ####################
+
+Locating element: source
+Locating element: target
+Dragged source element: **source** to target: ***target**
+
+#################### TEST STEP: Verify if Drag and Drop Successful  ####################
+
+waiting for 30 seconds until element: **debit_movement_amount** is visible 
+
+#################### TEST STEP: Verify that the Drag and Drop amount is the same as expected  ####################
+
+Locating element: debit_movement_amount
+the text in **debit_movement_amount** is: *** 5000 ***
+
+Verified Successfully! expected text: **5000** is in actual text of **debit_movement_amount**: **5000**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_dropdown</td>
+          <td class="col-duration">1.53</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: Navigate to Dropdown Page  ####################
+
+Locating element: DROPDOWN_LINK
+Clicked on element: DROPDOWN_LINK
+
+#################### TEST STEP: Select Item from Dropdown using value: &#x27;1&#x27; and verify.  ####################
+
+Locating element: open_dropdown_list
+Selecting from dropdown element of: open_dropdown_list
+With the value of: 1
+Verifying if option is selected successfully.
+Locating element: open_dropdown_list
+The text of selected item is: Option 1
+The item attribute used is &#x27;value&#x27; and the data is: **1**
+Verified Successfully! expected value: **1** is present on selected item&#x27;s actual value: **1**
+
+#################### TEST STEP: Select different item from dropdown. Using value: &#x27;2&#x27; and verify.  ####################
+
+Locating element: open_dropdown_list
+Selecting from dropdown element of: open_dropdown_list
+With the value of: 2
+Verifying if option is selected successfully.
+Locating element: open_dropdown_list
+The text of selected item is: Option 2
+The item attribute used is &#x27;value&#x27; and the data is: **2**
+Verified Successfully! expected value: **2** is present on selected item&#x27;s actual value: **2**
+
+#################### TEST STEP: Select item from dropdown using index: &#x27;1&#x27; and verify.  ####################
+
+Locating element: open_dropdown_list
+Selecting from dropdown element of: open_dropdown_list
+With the index of: 1
+Verifying if option is selected successfully.
+Locating element: open_dropdown_list
+The text of selected item is: Option 1
+The item attribute used is &#x27;index&#x27; and the data is: **1**
+Verified Successfully! expected index: **1** is present on selected item&#x27;s actual index: **1**
+
+#################### TEST STEP: Select different item from dropdown. Using index: &#x27;2&#x27; and verify.  ####################
+
+Locating element: open_dropdown_list
+Selecting from dropdown element of: open_dropdown_list
+With the index of: 2
+Verifying if option is selected successfully.
+Locating element: open_dropdown_list
+The text of selected item is: Option 2
+The item attribute used is &#x27;index&#x27; and the data is: **2**
+Verified Successfully! expected index: **2** is present on selected item&#x27;s actual index: **2**
+
+#################### TEST STEP: Select item from dropdown using visible text: &#x27;Option 1&#x27; and verify.  ####################
+
+Locating element: open_dropdown_list
+Selecting from dropdown element of: open_dropdown_list
+With the visible text of: Option 1
+Verifying if option is selected successfully.
+Locating element: open_dropdown_list
+The text of selected item is: Option 1
+Verified Successfully! expected text: **Option 1** is present on selected item&#x27;s visible text: **Option 1**
+
+#################### TEST STEP: Select different item from dropdown. Using visible text: &#x27;Option 2&#x27; and verify.  ####################
+
+Locating element: open_dropdown_list
+Selecting from dropdown element of: open_dropdown_list
+With the visible text of: Option 2
+Verifying if option is selected successfully.
+Locating element: open_dropdown_list
+The text of selected item is: Option 2
+Verified Successfully! expected text: **Option 2** is present on selected item&#x27;s visible text: **Option 2**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_dynamic_content</td>
+          <td class="col-duration">9.98</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: Navigate to Dynamic Content Page  ####################
+
+Locating element: DYNAMIC_CONTENT_LINK
+Clicked on element: DYNAMIC_CONTENT_LINK
+
+#################### TEST STEP: Get 3 paragraphs and add it to a list and put it to &#x27;old_list&#x27;   ####################
+
+Finding all elements with xpath of: list_of_paragraphs_data_locator
+Locating all elements of: list_of_paragraphs_data_locator
+Adding all element text to the list.
+The list data is: [&#x27;Pariatur aut voluptatem quisquam in molestiae doloribus eius culpa accusantium iure atque vero est enim quasi adipisci rerum eaque autem delectus alias dolores nam qui quaerat odio aut omnis consequatur voluptates non.&#x27;, &#x27;Velit incidunt sint qui quis qui sit voluptatem molestias dolorum quae necessitatibus unde tenetur aut mollitia ut rerum ut minus occaecati officiis quo assumenda sequi nesciunt et libero quasi sunt dolorem perferendis aut ratione.&#x27;, &#x27;Sit architecto qui voluptatem placeat labore odio molestiae laborum asperiores eveniet quis sequi dolor unde porro cum reiciendis sint rerum repudiandae tempore ea alias enim repellendus neque quasi deserunt earum non omnis quidem quod.&#x27;]
+
+#################### TEST STEP: Refresh Page to load new paragraphs  ####################
+
+Refreshing the Page.
+Sleep for a few seconds: 8
+
+#################### TEST STEP: Get 3 paragraphs and add it to a list and put it to &#x27;new_list&#x27;   ####################
+
+Finding all elements with xpath of: list_of_paragraphs_data_locator
+Locating all elements of: list_of_paragraphs_data_locator
+Adding all element text to the list.
+The list data is: [&#x27;Expedita quo et fugit qui ipsam voluptas velit eveniet ut odit in quaerat sunt quidem voluptas magnam doloribus saepe id facilis nesciunt culpa eum minus ex esse omnis illo explicabo ipsa sit repudiandae eius.&#x27;, &#x27;Tempora cupiditate vel exercitationem ex doloremque deleniti natus et ab consequatur molestiae dignissimos magnam eum et ratione dicta ducimus quos delectus modi aliquid quidem id voluptatem libero suscipit excepturi ut itaque est quia aut.&#x27;, &#x27;Aut veniam illo iste earum voluptatem eum occaecati dolorem aspernatur odio sed voluptas adipisci rerum perferendis voluptatibus dicta fuga repellat et ea at nihil alias mollitia labore aut tempora culpa velit.&#x27;]
+
+#################### TEST STEP: Verify that old_list and new_list is not the same  ####################
+
+Verified! &#x27;List 1&#x27; with data: 
+[&#x27;Pariatur aut voluptatem quisquam in molestiae doloribus eius culpa accusantium iure atque vero est enim quasi adipisci rerum eaque autem delectus alias dolores nam qui quaerat odio aut omnis consequatur voluptates non.&#x27;, &#x27;Velit incidunt sint qui quis qui sit voluptatem molestias dolorum quae necessitatibus unde tenetur aut mollitia ut rerum ut minus occaecati officiis quo assumenda sequi nesciunt et libero quasi sunt dolorem perferendis aut ratione.&#x27;, &#x27;Sit architecto qui voluptatem placeat labore odio molestiae laborum asperiores eveniet quis sequi dolor unde porro cum reiciendis sint rerum repudiandae tempore ea alias enim repellendus neque quasi deserunt earum non omnis quidem quod.&#x27;]
+is not the same as &#x27;List 2&#x27; with data: 
+[&#x27;Expedita quo et fugit qui ipsam voluptas velit eveniet ut odit in quaerat sunt quidem voluptas magnam doloribus saepe id facilis nesciunt culpa eum minus ex esse omnis illo explicabo ipsa sit repudiandae eius.&#x27;, &#x27;Tempora cupiditate vel exercitationem ex doloremque deleniti natus et ab consequatur molestiae dignissimos magnam eum et ratione dicta ducimus quos delectus modi aliquid quidem id voluptatem libero suscipit excepturi ut itaque est quia aut.&#x27;, &#x27;Aut veniam illo iste earum voluptatem eum occaecati dolorem aspernatur odio sed voluptas adipisci rerum perferendis voluptatibus dicta fuga repellat et ea at nihil alias mollitia labore aut tempora culpa velit.&#x27;]
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_dynamic_controls</td>
+          <td class="col-duration">20.96</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+#################### TEST STEP: --- Test Remove/add Button ---  ####################
+
+
+#################### TEST STEP: Navigate to DynamicControls URL  ####################
+
+Locating element: DYNAMIC_CONTROLS_LINK
+Clicked on element: DYNAMIC_CONTROLS_LINK
+
+#################### TEST STEP: Verify that Checkbox is visible  ####################
+
+waiting for 15 seconds until element: **checkbox_default** is visible 
+
+#################### TEST STEP: put a check on checkbox  ####################
+
+Locating element: checkbox_default
+Clicked on element: checkbox_default
+
+#################### TEST STEP: Click &#x27;Remove&#x27; button  ####################
+
+Locating element: remove_or_add_button
+Clicked on element: remove_or_add_button
+
+#################### TEST STEP: Verify that Checkbox is no longer visible  ####################
+
+waiting for 15 seconds until element: **checkbox_default** is NOT visible 
+
+#################### TEST STEP: Verify element text --It&#x27;s gone!-- is visible  ####################
+
+Locating element: message
+the text in **message** is: *** It&#x27;s gone! ***
+
+Verified Successfully! expected text: **It&#x27;s gone!** is in actual text of **message**: **It&#x27;s gone!**
+
+#################### TEST STEP: Click &#x27;Add&#x27; button  ####################
+
+Locating element: remove_or_add_button
+Clicked on element: remove_or_add_button
+
+#################### TEST STEP: Verify that the checkbox is back  ####################
+
+waiting for 15 seconds until element: **checkbox_showing_back** is visible 
+
+#################### TEST STEP: Verify element text --It&#x27;s back!-- is visible  ####################
+
+Locating element: message
+the text in **message** is: *** It&#x27;s back! ***
+
+Verified Successfully! expected text: **It&#x27;s back!** is in actual text of **message**: **It&#x27;s back!**
+
+#################### TEST STEP: #   --- Test Enabled/disabled button ---  ####################
+
+
+#################### TEST STEP: Find and Verify Input textbox is disabled  ####################
+
+Locating element: input_text_box
+All attributes of the **input_text_box** is: true
+expected attribute: **true** is present in all element attribute of **input_text_box**: **true**
+
+#################### TEST STEP: Verify Text is for enable button  ####################
+
+Locating element: enable_or_disable_button
+the text in **enable_or_disable_button** is: *** Enable ***
+
+Verified Successfully! expected text: **Enable** is in actual text of **enable_or_disable_button**: **Enable**
+
+#################### TEST STEP: Click &#x27;Enable&#x27; Button to enable Textbox  ####################
+
+Locating element: enable_or_disable_button
+Clicked on element: enable_or_disable_button
+
+#################### TEST STEP: Verify that the Input Textbox is now enabled  ####################
+
+Verified Successfully. Element **input_text_box** does NOT have attribute: **disabled**
+
+#################### TEST STEP: Verify that the message says it is Enabled  ####################
+
+Locating element: message
+the text in **message** is: *** It&#x27;s enabled! ***
+
+Verified Successfully! expected text: **It&#x27;s enabled!** is in actual text of **message**: **It&#x27;s enabled!**
+
+#################### TEST STEP: Verify  text is enabled by sending dummy text to it  ####################
+
+Clearing all previously inputted text.
+Locating element: input_text_box
+Sending data to **input_text_box**.
+Locating element: input_text_box
+The sent data is: **Test Only**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_dynamic_loading</td>
+          <td class="col-duration">12.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: DYNAMIC_LOADING_LINK
+Clicked on element: DYNAMIC_LOADING_LINK
+Locating element: example_1
+Clicked on element: example_1
+waiting for 10 seconds until element: **dynamic_element_visibility** is NOT visible 
+waiting for 10 seconds until element: **dynamic_element_visibility** is attached to page. 
+Locating element: start_button
+Clicked on element: start_button
+waiting for 30 seconds until element: **dynamic_element_visibility** is visible 
+Locating element: example_2
+Clicked on element: example_2
+waiting for 30 seconds until element: **dynamic_element_visibility** is NOT visible 
+waiting for 30 seconds until element: **dynamic_element_visibility** is NOT attached to page. 
+Locating element: start_button
+Clicked on element: start_button
+waiting for 30 seconds until element: **dynamic_element_visibility** is visible 
+waiting for 30 seconds until element: **dynamic_element_visibility** is attached to page. 
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_entry_ad</td>
+          <td class="col-duration">22.61</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: ENTRY_AD_LINK
+Clicked on element: ENTRY_AD_LINK
+waiting for 30 seconds until element: **close_modal** is visible 
+Locating element: close_modal
+Clicked on element: close_modal
+waiting for 30 seconds until element: **close_modal** is NOT visible 
+Locating element: re_enable_modal
+Clicked on element: re_enable_modal
+waiting for 30 seconds until element: **close_modal** is visible 
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_file_download</td>
+          <td class="col-duration">21.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: FILE_DOWNLOAD_LINK
+Clicked on element: FILE_DOWNLOAD_LINK
+Locating element: test_image_png
+Clicked on element: test_image_png
+File Download is Complete!
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_file_upload</td>
+          <td class="col-duration">7.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: FILE_UPLOAD_LINK
+Clicked on element: FILE_UPLOAD_LINK
+Sending keys to **[&#x27;choose_file_to_upload_button&#x27;, &#x27;//*[@id=&quot;file-upload&quot;]&#x27;]**
+Locating element: choose_file_to_upload_button
+The sent data is: **C:\Users\Administrator\Downloads\test_image.png**
+Locating element: submit_file_upload_button
+Clicked on element: submit_file_upload_button
+waiting for 30 seconds until element: **success_file_upload_label** is visible 
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_floating_menu</td>
+          <td class="col-duration">6.16</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: FLOATING_MENU_LINK
+Clicked on element: FLOATING_MENU_LINK
+waiting for 30 seconds until element: **home_floating_menu** is visible 
+waiting for 30 seconds until element: **news_floating_menu** is visible 
+waiting for 30 seconds until element: **about_floating_menu** is visible 
+waiting for 30 seconds until element: **contact_floating_menu** is visible 
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_form_authentication</td>
+          <td class="col-duration">23.35</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: FORM_AUTHENTICATION_LINK
+Clicked on element: FORM_AUTHENTICATION_LINK
+Clearing all previously inputted text.
+Locating element: username_input
+Sending data to **username_input**.
+Locating element: username_input
+The sent data is: **test_wrong_username**
+Clearing all previously inputted text.
+Locating element: password_input
+Sending data to **password_input**.
+Locating element: password_input
+The sent data is: **test_wrong_password**
+Locating element: submit_button
+Clicked on element: submit_button
+Locating element: info_label
+the text in **info_label** is: *** Your username is invalid!
+× ***
+
+Verified Successfully! expected text: **Your username is invalid!** is in actual text of **info_label**: **Your username is invalid!
+×**
+Clearing all previously inputted text.
+Locating element: username_input
+Sending data to **username_input**.
+Locating element: username_input
+The sent data is: **tomsmith**
+Clearing all previously inputted text.
+Locating element: password_input
+Sending data to **password_input**.
+Locating element: password_input
+The sent data is: **SuperSecretPassword!**
+Locating element: submit_button
+Clicked on element: submit_button
+Locating element: info_label
+the text in **info_label** is: *** You logged into a secure area!
+× ***
+
+Verified Successfully! expected text: **You logged into a secure area!** is in actual text of **info_label**: **You logged into a secure area!
+×**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_frames_nested_frames</td>
+          <td class="col-duration">6.83</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: FRAMES_LINK
+Clicked on element: FRAMES_LINK
+Locating element: nested_frames_link
+Clicked on element: nested_frames_link
+switched to top
+switched to: frame-left
+Locating element: nested_frame_body
+the text in **nested_frame_body** is: *** LEFT ***
+
+Verified Successfully! expected text: **LEFT** is in actual text of **nested_frame_body**: **LEFT**
+Getting the element text of: *** nested_frame_body ***
+Locating element: nested_frame_body
+The element text is: *** LEFT ***
+Locating element: nested_frame_body
+LEFT
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_frames_i_frame</td>
+          <td class="col-duration">18.86</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: FRAMES_LINK
+Clicked on element: FRAMES_LINK
+Locating element: iframe_link
+Clicked on element: iframe_link
+Clearing all previously inputted text.
+Locating element: iframe_input
+Sending data to **iframe_input**.
+Locating element: iframe_input
+The sent data is: **Testing Only**
+Locating element: iframe_input
+the text in **iframe_input** is: *** Testing Only ***
+
+Verified Successfully! expected text: **Testing Only** is in actual text of **iframe_input**: **Testing Only**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_geolocation</td>
+          <td class="col-duration">1.38</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: GEOLOCATION_LINK
+Clicked on element: GEOLOCATION_LINK
+Locating element: where_am_i_button
+Clicked on element: where_am_i_button
+Getting the element text of: *** latitude_label ***
+Locating element: latitude_label
+The element text is: *** 10.683296 ***
+Locating element: latitude_label
+10.683296
+Getting the element text of: *** longitude_value ***
+Locating element: longitude_value
+The element text is: *** 122.955681 ***
+Locating element: longitude_value
+122.955681
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_horizontal_slider</td>
+          <td class="col-duration">3.64</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: HORIZONTAL_SLIDER_LINK
+Clicked on element: HORIZONTAL_SLIDER_LINK
+Getting the element text of: *** slider_value ***
+Locating element: slider_value
+The element text is: *** 0 ***
+Locating element: slider_value
+Locating element: slider
+try using x_position value is offset by: 0
+Getting the element text of: *** slider_value ***
+Locating element: slider_value
+The element text is: *** 2.5 ***
+Locating element: slider_value
+Locating element: slider
+try using x_position value is offset by: 2.5
+Getting the element text of: *** slider_value ***
+Locating element: slider_value
+The element text is: *** 3 ***
+Locating element: slider_value
+Locating element: slider
+try using x_position value is offset by: 3
+Getting the element text of: *** slider_value ***
+Locating element: slider_value
+The element text is: *** 3.5 ***
+Locating element: slider_value
+Locating element: slider
+try using x_position value is offset by: 3.5
+Getting the element text of: *** slider_value ***
+Locating element: slider_value
+The element text is: *** 4 ***
+Locating element: slider_value
+Locating element: slider
+try using x_position value is offset by: 4
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_hovers</td>
+          <td class="col-duration">11.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: HOVERS_LINK
+Clicked on element: HOVERS_LINK
+waiting for 30 seconds until element: **name1** is NOT visible 
+Locating element: profile_image_1
+Hovered on element: profile_image_1
+waiting for 30 seconds until element: **name1** is visible 
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_infinite_scroll</td>
+          <td class="col-duration">25.98</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: INFINITE_SCROLL_LINK
+Clicked on element: INFINITE_SCROLL_LINK
+Locating all elements of: number_of_divs
+Total divs before scroll: 2
+scroll times: 1
+scroll times: 2
+scroll times: 3
+scroll times: 4
+scroll times: 5
+scroll times: 6
+scroll times: 7
+scroll times: 8
+scroll times: 9
+scroll times: 10
+Locating all elements of: number_of_divs
+Total divs after scroll: 12
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_inputs</td>
+          <td class="col-duration">10.84</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: INPUT_PAGE_LINK
+Clicked on element: INPUT_PAGE_LINK
+Clearing all previously inputted text.
+Locating element: input_field
+Sending data to **input_field**.
+Locating element: input_field
+The sent data is: **777**
+Locating element: input_field
+getting the attribute value of input_field. The value is: 777
+777
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_jquery_ui_menus</td>
+          <td class="col-duration">14.85</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: JQUERY_UI_MENUS_LINK
+Clicked on element: JQUERY_UI_MENUS_LINK
+Locating element: menu_option_enabled
+Hovered on element: menu_option_enabled
+Locating element: menu_option_downloads
+Hovered on element: menu_option_downloads
+waiting for 30 seconds until element: **menu_option_pdf** is visible 
+waiting for 30 seconds until element: **menu_option_csv** is visible 
+waiting for 30 seconds until element: **menu_option_excel** is visible 
+Locating element: menu_option_back_to_jquery_ui
+Clicked on element: menu_option_back_to_jquery_ui
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_javascript_alerts</td>
+          <td class="col-duration">1.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: JAVASCRIPT_ALERTS_LINK
+Clicked on element: JAVASCRIPT_ALERTS_LINK
+Locating element: regular_alert
+Clicked on element: regular_alert
+actual alert message: I am a JS Alert
+Verified Successfully. expected alert: **I am a JS Alert** is in actual alert message: **I am a JS Alert**
+Action: Alert Accepted!
+Locating element: result_label
+the text in **result_label** is: *** You successfully clicked an alert ***
+
+Verified Successfully! expected text: **You successfully clicked an alert** is in actual text of **result_label**: **You successfully clicked an alert**
+Locating element: confirm_alert
+Clicked on element: confirm_alert
+actual alert message: I am a JS Confirm
+Verified Successfully. expected alert: **I am a JS Confirm** is in actual alert message: **I am a JS Confirm**
+Action: Alert Accepted!
+Locating element: result_label
+the text in **result_label** is: *** You clicked: Ok ***
+
+Verified Successfully! expected text: **You clicked: Ok** is in actual text of **result_label**: **You clicked: Ok**
+Locating element: confirm_alert
+Clicked on element: confirm_alert
+actual alert message: I am a JS Confirm
+Verified Successfully. expected alert: **I am a JS Confirm** is in actual alert message: **I am a JS Confirm**
+Action: Alert Dismissed!
+Locating element: result_label
+the text in **result_label** is: *** You clicked: Cancel ***
+
+Verified Successfully! expected text: **You clicked: Cancel** is in actual text of **result_label**: **You clicked: Cancel**
+Locating element: prompt_alert
+Clicked on element: prompt_alert
+actual alert message: I am a JS prompt
+Verified Successfully. expected alert: **I am a JS prompt** is in actual alert message: **I am a JS prompt**
+Sent Keys on alert. Keys: **Test Only**
+Action: Alert Accepted!
+Locating element: result_label
+the text in **result_label** is: *** You entered: Test Only ***
+
+Verified Successfully! expected text: **You entered: Test Only** is in actual text of **result_label**: **You entered: Test Only**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_key_presses</td>
+          <td class="col-duration">21.03</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: KEY_PRESS_LINK
+Clicked on element: KEY_PRESS_LINK
+Clearing all previously inputted text.
+Locating element: input_field
+Sending data to **input_field**.
+Locating element: input_field
+The sent data is: **a**
+Locating element: result_label
+the text in **result_label** is: *** You entered: A ***
+
+Verified Successfully! expected text: **You entered: A** is in actual text of **result_label**: **You entered: A**
+Clearing all previously inputted text.
+Locating element: input_field
+Sending data to **input_field**.
+Locating element: input_field
+The sent data is: **1**
+Locating element: result_label
+the text in **result_label** is: *** You entered: 1 ***
+
+Verified Successfully! expected text: **You entered: 1** is in actual text of **result_label**: **You entered: 1**
+Locating element: result_label
+the text in **result_label** is: *** You entered: ESCAPE ***
+
+Verified Successfully! expected text: **ESCAPE** is in actual text of **result_label**: **You entered: ESCAPE**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_large_and_deep_dom</td>
+          <td class="col-duration">1.74</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: LARGE_AND_DEEP_DOM_LINK
+Clicked on element: LARGE_AND_DEEP_DOM_LINK
+waiting for 30 seconds until element: **last_sibling_number** is visible 
+Getting the element text of: *** last_sibling_number ***
+Locating element: last_sibling_number
+The element text is: *** 50.3 ***
+Locating element: last_sibling_number
+last sibling number: 50.3
+waiting for 30 seconds until element: **last_sibling_from_table** is visible 
+Getting the element text of: *** last_sibling_from_table ***
+Locating element: last_sibling_from_table
+The element text is: *** 50.50 ***
+Locating element: last_sibling_from_table
+last table number: 50.50
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_multiple_window</td>
+          <td class="col-duration">10.88</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Locating element: MULTIPLE_WINDOWS_PAGE_LINK
+Clicked on element: MULTIPLE_WINDOWS_PAGE_LINK
+Locating element: open_new_window_link
+Clicked on element: open_new_window_link
+You switched to tab with the index of: 1
+The current url is: https://the-internet.herokuapp.com/windows/new
+Verified Successfully! the current url: **https://the-internet.herokuapp.com/windows/new** matches with expected url: **https://the-internet.herokuapp.com/windows/new**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_notification_message</td>
+          <td class="col-duration">4.87</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>Navigate to Notification Message Page
+Locating element: NOTIFICATION_MESSAGE_PAGE_LINK
+Clicked on element: NOTIFICATION_MESSAGE_PAGE_LINK
+Get Notification Message
+Getting the element text of: *** notification_message ***
+Locating element: notification_message
+The element text is: *** Action successful
+× ***
+Locating element: notification_message
+Click &quot;Click here&quot; link to load new message and keep clicking until new message is loaded
+Locating element: load_new_notification_message_link
+Clicked on element: load_new_notification_message_link
+Getting the element text of: *** notification_message ***
+Locating element: notification_message
+The element text is: *** Action unsuccesful, please try again
+× ***
+Locating element: notification_message
+Action unsuccesful, please try again
+×
+Loaded different message successfully. 
+ Old message: Action successful
+× 
+New message: Action unsuccesful, please try again
+×
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_redirect_link</td>
+          <td class="col-duration">6.43</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>--- Navigate to redirect link ---
+Locating element: REDIRECT_PAGE_LINK
+Clicked on element: REDIRECT_PAGE_LINK
+--- click &#x27;here&#x27; link to redirect to status codes page ---
+Locating element: redirect_trigger_link
+Clicked on element: redirect_trigger_link
+--- Verify page url is &#x27;https://the-internet.herokuapp.com/status_codes&#x27; ---
+The current url is: https://the-internet.herokuapp.com/status_codes
+Verified Successfully! the current url: **https://the-internet.herokuapp.com/status_codes** matches with expected url: **https://the-internet.herokuapp.com/status_codes**
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_shifting_content</td>
+          <td class="col-duration">6.59</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>#   --- Navigate to Shifting Content Page ---
+Locating element: SHIFTING_CONTENT_PAGE_LINK
+Clicked on element: SHIFTING_CONTENT_PAGE_LINK
+#   --- Click on Example 1: Menu Element ---
+Locating element: example_1_link
+Clicked on element: example_1_link
+#   --- Get &#x27;Gallery&#x27; Nav current position
+Locating element: nav_gallery
+The current location of **nav_gallery** is: {&#x27;x&#x27;: 893, &#x27;y&#x27;: 292}
+#   --- Refresh Page and Keep refreshing until new position is generated ---
+Locating element: nav_gallery
+The current location of **nav_gallery** is: {&#x27;x&#x27;: 893, &#x27;y&#x27;: 292}
+Old location is the same as New Location. Refresh the page and try again.
+Refresh count: 1
+Locating element: nav_gallery
+The current location of **nav_gallery** is: {&#x27;x&#x27;: 868, &#x27;y&#x27;: 292}
+Old location is not the same as New Location.
+Old Location: {&#x27;x&#x27;: 893, &#x27;y&#x27;: 292}
+New Location: {&#x27;x&#x27;: 868, &#x27;y&#x27;: 292}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_sortable_data_tables</td>
+          <td class="col-duration">6.41</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/># --- Navigate to Sortable Data Tables Page ---
+Locating element: SORTABLE_DATA_TABLES_PAGE_LINK
+Clicked on element: SORTABLE_DATA_TABLES_PAGE_LINK
+# --- Get All Last Names and save as default_list ---
+Locating all elements of: get_all_last_names
+Added to default_list: Smith
+Added to default_list: Bach
+Added to default_list: Doe
+Added to default_list: Conway
+unsorted default_list: [&#x27;Smith&#x27;, &#x27;Bach&#x27;, &#x27;Doe&#x27;, &#x27;Conway&#x27;]
+# --- Sort the &#x27;default_list&#x27; ---
+sorted default_list: [&#x27;Bach&#x27;, &#x27;Conway&#x27;, &#x27;Doe&#x27;, &#x27;Smith&#x27;]
+# --- Click Table Header &#x27;Last Name&#x27; to sort the table via Last Name ---
+Locating element: sort_by_last_name
+Clicked on element: sort_by_last_name
+# --- Get All Last Names and save as sorted_list ---
+Locating all elements of: get_all_last_names
+Added to sorted_list: Bach
+Added to sorted_list: Conway
+Added to sorted_list: Doe
+Added to sorted_list: Smith
+# --- Verify that the sorted default_list is the same as sorted_list ---
+Sort descending success
+Data of sorted_list: [&#x27;Bach&#x27;, &#x27;Conway&#x27;, &#x27;Doe&#x27;, &#x27;Smith&#x27;]
+sorted default_list: [&#x27;Bach&#x27;, &#x27;Conway&#x27;, &#x27;Doe&#x27;, &#x27;Smith&#x27;]
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_selenium_actions.py::TestTheInternet::test_wysiwyg_editor</td>
+          <td class="col-duration">23.81</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Navigate to BaseURL
+<br/> ------------------------------Captured stdout call------------------------------ <br/>#   --- Navigate to WYSIWYG Editor Page ---
+Locating element: WYSIWYG_PAGE_LINK
+Clicked on element: WYSIWYG_PAGE_LINK
+#   --- Switch to iFrame ---
+#   --- Enter &#x27;Test Only&#x27; on Editor ---
+Locating element: input_field
+Clicked on element: input_field
+Clearing all previously inputted text.
+Locating element: input_field
+Sending data to **input_field**.
+Locating element: input_field
+The sent data is: **Test Only**
+#   --- Verify entered data is &#x27;Test Only&#x27; ---
+Locating element: input_field
+the text in **input_field** is: *** Test Only ***
+
+Verified Successfully! expected text: **Test Only** is in actual text of **input_field**: **Test Only**
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+THIS IS A TEARDOWN CONFIGURATION!
+<br/></div></td></tr></tbody></table></body></html>
