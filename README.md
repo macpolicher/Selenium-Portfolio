@@ -5,6 +5,7 @@ INSTRUCTIONS ON HOW TO RUN TEST:
 1. Download The Project.
 2. Open on Pycharm or other Editors.
 3. If there is a pop-up asking for you to "Create Virtual Environment", Just Click Okay. Then proceed to step 4.
+
 3.1 If there is no pop up, follow this steps:
 3.2 open terminal and navigate to root folder.
 3.3 create virtual environment by typing: pip install virtualenv
