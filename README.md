@@ -24,5 +24,5 @@ INFO:
 - Created using Selenium, Python, and pytest
 - I use Page Object Model and my own created framework
 - Tests are created using "The-Internet" from Heroku. 
-reference website: https://the-internet.herokuapp.com/
-reference github repository: https://github.com/saucelabs/the-internet
+- reference website: https://the-internet.herokuapp.com/
+- reference github repository: https://github.com/saucelabs/the-internet
